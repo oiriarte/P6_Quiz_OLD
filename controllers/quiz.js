@@ -153,3 +153,86 @@ exports.check = (req, res, next) => {
         answer
     });
 };
+
+// GET/quizzes/randomplay
+
+exports.playrandom = (req, res, next) => {
+
+    let getRandomId = () =>{
+        let id = req.session.randomplay[Math.floor((Math.random() * req.session.randomplay.length))];
+        req.session.randomplay.splice(req.session.randomplay.indexOf(id), 1);
+        console.log("El id es: "+id);
+        return id;
+    }
+    let gameStarted = () =>{
+        if(req.session.started === undefined){
+            console.log("SE INICIA DE NUEVO");
+            req.session.randomplay = [];
+            req.session.score = 0;
+            req.session.started = true;
+            return models.quiz.count().then(numOfQuizzes =>{
+                for(let i = 0; i < numOfQuizzes; i++){
+                    req.session.randomplay[i] = i+1;
+                }
+            });
+        }
+        console.log("started "+req.session.started);
+        return Promise.resolve();
+    } 
+
+    gameStarted().then(() => {
+        if(req.session.started && req.session.randomplay.length === 0){
+            return new Promise(resolve =>{
+                let score = req.session.score;
+                delete req.session.started;
+                res.render('quizzes/random_nomore',{
+                    score
+                });
+            })
+        }
+        return models.quiz.findById(getRandomId()).then(quiz => {
+            let score = req.session.score;
+            console.log("Responde pregunta----->>>>>>");
+            console.log(req.session.started);
+            console.log(req.session.randomplay)
+            res.render('quizzes/random_play',{
+                score,
+                quiz
+            });
+        })
+    }).catch(e =>{
+        res.render('error',e);
+    })
+};
+
+//GET /quizzes/randomcheck/:quizId?answer=respuesta
+exports.playresult = (req, res, next) => {
+    let answer = req.query.answer;
+    let quizId = req.params.quizId;
+    console.log("Comprobacion");
+    console.log(quizId);
+    models.quiz.findById(quizId).then(quiz =>{
+        let score = 0;
+        if(quiz.answer === answer){
+            result = 1;
+            req.session.score++;
+        }else{
+            result = 0;
+            delete req.session.started;
+        }
+        score = req.session.score;
+        res.render('quizzes/random_result',{
+            score,
+            answer,
+            result
+        })  
+    });
+
+};
+
+exports.playnomore = (req, res, next) => {
+    let score = 0;
+    res.render('quizzes/random_nomore',{
+        score
+    })  
+};
